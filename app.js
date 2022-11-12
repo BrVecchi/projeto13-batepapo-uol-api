@@ -21,7 +21,7 @@ let db;
 await mongoClient.connect();
 db = mongoClient.db("uol-db");
 
-const participatnsCollection = db.collection("participants");
+const participantsCollection = db.collection("participants");
 const messagesCollection = db.collection("messages");
 
 const app = express();
@@ -31,7 +31,7 @@ app.use(cors());
 // "/participants" route
 app.get("/participants", async (req, res) => {
   try {
-    const participants = await participatnsCollection.find({}).toArray();
+    const participants = await participantsCollection.find({}).toArray();
     res.status(200).send(participants);
   } catch (error) {
     console.error(error);
@@ -50,12 +50,12 @@ app.post("/participants", async (req, res) => {
 
   try {
     const { name } = req.body;
-    const nameValidation = await participatnsCollection.findOne({ name: name });
+    const nameValidation = await participantsCollection.findOne({ name: name });
     if (nameValidation) {
       res.sendStatus(409);
       return;
     }
-    await participatnsCollection.insertOne({
+    await participantsCollection.insertOne({
       name: user.name,
       lastStatus: Date.now(),
     });
@@ -74,16 +74,9 @@ app.post("/participants", async (req, res) => {
 });
 
 // "/messages" route
-
 app.post("/messages", async (req, res) => {
   const { to, text, type } = req.body;
   const { from } = req.headers;
-  const message = {
-    to,
-    text,
-    type,
-    from,
-  };
   const messageValidation = {
     to,
     text,
@@ -101,7 +94,7 @@ app.post("/messages", async (req, res) => {
   }
 
   try {
-    const fromValidation = await participatnsCollection.findOne({ name: from });
+    const fromValidation = await participantsCollection.findOne({ name: from });
     if (!fromValidation) {
       res.sendStatus(422);
       return;
@@ -120,15 +113,43 @@ app.post("/messages", async (req, res) => {
     res.sendStatus(500);
   }
 });
-
 app.get("/messages/", async (req, res) => {
   const limit = Number(req.query.limit);
+  const { user } = req.headers;
 
   try {
-    const messages = await messagesCollection.find({}).limit(limit || 0).toArray();
-    res.status(200).send(messages);
+    const messages = await messagesCollection
+      .find({})
+      .limit(limit || 0)
+      .toArray();
+    const messagesToShow = messages.filter(
+      (message) => message.to === "Todos" || message.to === user
+    );
+    res.status(200).send(messagesToShow);
   } catch (error) {
     console.error(error);
+    res.sendStatus(500);
+  }
+});
+
+// "/status" route
+app.post("/status", async (req, res) => {
+  const {user}  = req.headers;
+  console.log(user);
+
+  try {
+    const userToValidate = await participantsCollection.findOne({ name: user });
+    if (!userToValidate) {
+      res.sendStatus(404);
+      return;
+    }
+    await participantsCollection.updateOne(
+      { _id: ObjectId(user._id) },
+      { $set: { lastStatus: Date.now() } }
+    );
+    res.sendStatus(200);
+  } catch (error) {
+    // console.error(error)
     res.sendStatus(500);
   }
 });
