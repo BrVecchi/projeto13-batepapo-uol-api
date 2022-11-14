@@ -28,13 +28,13 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-
-
 // status validation
 const statusValidation = async () => {
   const participants = await participantsCollection.find().toArray();
-  const participantsToDelete = participants.filter((participant) => ((Date.now() - participant.lastStatus) > 10000))
-  participantsToDelete.forEach( async (participant) => {
+  const participantsToDelete = participants.filter(
+    (participant) => Date.now() - participant.lastStatus > 10000
+  );
+  participantsToDelete.forEach(async (participant) => {
     await participantsCollection.deleteOne({ name: participant.name });
     await messagesCollection.insertOne({
       from: participant.name,
@@ -43,8 +43,7 @@ const statusValidation = async () => {
       type: "status",
       time: dayjs().format("HH:MM:ss"),
     });
-  })
-
+  });
 };
 setInterval(statusValidation, 15000);
 
@@ -141,6 +140,7 @@ app.get("/messages/", async (req, res) => {
   try {
     const messages = await messagesCollection
       .find({})
+      .sort({ $natural: -1 })
       .limit(limit || 0)
       .toArray();
     const messagesToShow = messages.filter(
