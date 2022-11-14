@@ -28,6 +28,26 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+
+
+// status validation
+const statusValidation = async () => {
+  const participants = await participantsCollection.find().toArray();
+  const participantsToDelete = participants.filter((participant) => ((Date.now() - participant.lastStatus) > 10000))
+  participantsToDelete.forEach( async (participant) => {
+    await participantsCollection.deleteOne({ name: participant.name });
+    await messagesCollection.insertOne({
+      from: participant.name,
+      to: "Todos",
+      text: "sai da sala...",
+      type: "status",
+      time: dayjs().format("HH:MM:ss"),
+    });
+  })
+
+};
+setInterval(statusValidation, 15000);
+
 // "/participants" route
 app.get("/participants", async (req, res) => {
   try {
@@ -76,7 +96,8 @@ app.post("/participants", async (req, res) => {
 // "/messages" route
 app.post("/messages", async (req, res) => {
   const { to, text, type } = req.body;
-  const { from } = req.headers;
+  const { user } = req.headers;
+
   const messageValidation = {
     to,
     text,
@@ -86,7 +107,7 @@ app.post("/messages", async (req, res) => {
   const validation = messageSchema.validate(messageValidation, {
     abortEarly: false,
   });
-  console.log(validation);
+
   if (validation.error) {
     const errors = validation.error.details.map((detail) => detail.message);
     res.status(422).send(errors);
@@ -94,17 +115,17 @@ app.post("/messages", async (req, res) => {
   }
 
   try {
-    const fromValidation = await participantsCollection.findOne({ name: from });
+    const fromValidation = await participantsCollection.findOne({ name: user });
     if (!fromValidation) {
       res.sendStatus(422);
       return;
     }
 
     await messagesCollection.insertOne({
-      from: from,
-      to: to,
-      text: text,
-      type: type,
+      from: user,
+      to,
+      text,
+      type,
       time: dayjs().format("HH:MM:ss"),
     });
     res.sendStatus(201);
@@ -134,8 +155,7 @@ app.get("/messages/", async (req, res) => {
 
 // "/status" route
 app.post("/status", async (req, res) => {
-  const {user}  = req.headers;
-  console.log(user);
+  const { user } = req.headers;
 
   try {
     const userToValidate = await participantsCollection.findOne({ name: user });
