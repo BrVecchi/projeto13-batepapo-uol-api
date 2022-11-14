@@ -146,7 +146,7 @@ app.get("/messages/", async (req, res) => {
     const messagesToShow = messages.filter(
       (message) => message.to === "Todos" || message.to === user
     );
-    res.status(200).send(messagesToShow);
+    res.status(200).send(messagesToShow.reverse());
   } catch (error) {
     console.error(error);
     res.sendStatus(500);
